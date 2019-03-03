@@ -19,6 +19,7 @@ struct KBuff {
     cur: char,
     identifier: String,
     file: BufReader<File>,
+    file_name: String,
 }
 
 impl KBuff {
@@ -26,10 +27,12 @@ impl KBuff {
         KBuff {
             cur: ' ',
             identifier: String::new(),
+            file_name: f.clone(),
             file: BufReader::new(File::open(f).unwrap()),
         }
     }
-
+}
+impl KBuff {
     fn get_next_char(&mut self) -> Result<char, Error> {
         let mut buf = vec![0; 1];
         if self.file.read(&mut buf).expect("Couldn't read to buffer") != 0 {
@@ -45,7 +48,7 @@ impl KBuff {
     }
 }
 
-fn is_op(c: &char) -> bool {
+fn is_op(c: char) -> bool {
     match c {
         '+' => true,
         '-' => true,
@@ -76,7 +79,7 @@ fn parse_token(buf: &mut KBuff) -> Result<Token, Error> {
     }
 
     // Handle Operators.
-    if is_op(&buf.cur) {
+    if is_op(buf.cur) {
         ident.push(buf.cur);
         buf.get_next_char()?;
         return Ok(Token::Operator(ident));
@@ -100,7 +103,7 @@ fn parse_token(buf: &mut KBuff) -> Result<Token, Error> {
             buf.get_next_char()?;
             return Ok(Token::Delimiter);
         }
-        c if is_op(&c) => {
+        c if is_op(c) => {
             // this is will never be reached but I dont know if I want to change how I handle
             // operators.
             ident.push(buf.cur);
@@ -129,4 +132,67 @@ pub fn parse(f: String) -> String {
     }
 
     "".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::remove_file;
+    use std::fs::OpenOptions;
+    use std::io::prelude::*;
+    use uuid::Uuid;
+
+    impl KBuff {
+        fn with_str<'a>(s: &'a str) -> Self {
+            let file_name = format!("{:?}.k", Uuid::new_v4().to_string());
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(file_name.clone())
+                .unwrap();
+            writeln!(file, "{}", s).unwrap();
+            let file = OpenOptions::new()
+                .read(true)
+                .open(file_name.clone())
+                .unwrap();
+            KBuff {
+                cur: ' ',
+                identifier: String::new(),
+                file_name,
+                file: BufReader::new(file),
+            }
+        }
+        fn rewrite<'a>(self, s: &'a str) -> Self {
+            KBuff::with_str(s)
+        }
+    }
+    impl Drop for KBuff {
+        fn drop(&mut self) {
+            match remove_file(self.file_name.clone()) {
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_next_char() {
+        let mut buf = KBuff::with_str("def");
+        assert_eq!(buf.get_next_char().unwrap(), 'd');
+        assert_eq!(buf.get_next_char().unwrap(), 'e');
+        assert_eq!(buf.get_next_char().unwrap(), 'f');
+    }
+
+    #[test]
+    fn test_parse_tokens() {
+        let mut buf = KBuff::with_str("def");
+        assert_eq!(parse_token(&mut buf).unwrap(), Token::Def);
+        let mut buf = buf.rewrite("foo");
+        assert_eq!(
+            parse_token(&mut buf).unwrap(),
+            Token::Ident("foo".to_string())
+        );
+        let mut buf = buf.rewrite("extern");
+        assert_eq!(parse_token(&mut buf).unwrap(), Token::Extern);
+    }
 }
