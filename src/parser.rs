@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 
 #[derive(PartialEq, Debug, Clone)]
-enum Token {
+pub enum Token {
     Def,
     Extern,
     Delimiter,
@@ -181,6 +181,13 @@ mod tests {
         assert_eq!(buf.get_next_char().unwrap(), 'd');
         assert_eq!(buf.get_next_char().unwrap(), 'e');
         assert_eq!(buf.get_next_char().unwrap(), 'f');
+        let mut buf = buf.rewrite("extern");
+        assert_eq!(buf.get_next_char().unwrap(), 'e');
+        assert_eq!(buf.get_next_char().unwrap(), 'x');
+        assert_eq!(buf.get_next_char().unwrap(), 't');
+        assert_eq!(buf.get_next_char().unwrap(), 'e');
+        assert_eq!(buf.get_next_char().unwrap(), 'r');
+        assert_eq!(buf.get_next_char().unwrap(), 'n');
     }
 
     #[test]
@@ -194,5 +201,43 @@ mod tests {
         );
         let mut buf = buf.rewrite("extern");
         assert_eq!(parse_token(&mut buf).unwrap(), Token::Extern);
+        let mut buf = buf.rewrite(",");
+        assert_eq!(parse_token(&mut buf).unwrap(), Token::Comma);
+        let mut buf = buf.rewrite(";");
+        assert_eq!(parse_token(&mut buf).unwrap(), Token::Delimiter);
+        let mut buf = buf.rewrite("(");
+        assert_eq!(parse_token(&mut buf).unwrap(), Token::OpeningParenthesis);
+        let mut buf = buf.rewrite(")");
+        assert_eq!(parse_token(&mut buf).unwrap(), Token::ClosingParenthesis);
+    }
+    #[test]
+    fn test_parse_num() {
+        let mut buf = KBuff::with_str("10");
+        assert_eq!(parse_token(&mut buf).unwrap(), Token::Numeric(10.0));
+        let mut buf = buf.rewrite("20");
+        assert_eq!(parse_token(&mut buf).unwrap(), Token::Numeric(20.0));
+    }
+    #[test]
+    fn test_parse_ops() {
+        let mut buf = KBuff::with_str("+");
+        assert_eq!(
+            parse_token(&mut buf).unwrap(),
+            Token::Operator("+".to_string())
+        );
+        let mut buf = buf.rewrite("-");
+        assert_eq!(
+            parse_token(&mut buf).unwrap(),
+            Token::Operator("-".to_string())
+        );
+        let mut buf = buf.rewrite("*");
+        assert_eq!(
+            parse_token(&mut buf).unwrap(),
+            Token::Operator("*".to_string())
+        );
+        let mut buf = buf.rewrite("/");
+        assert_eq!(
+            parse_token(&mut buf).unwrap(),
+            Token::Operator("/".to_string())
+        );
     }
 }
