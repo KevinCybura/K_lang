@@ -162,10 +162,12 @@ mod tests {
                 file: BufReader::new(file),
             }
         }
+
         fn rewrite<'a>(self, s: &'a str) -> Self {
             KBuff::with_str(s)
         }
     }
+
     impl Drop for KBuff {
         fn drop(&mut self) {
             match remove_file(self.file_name.clone()) {
@@ -210,6 +212,7 @@ mod tests {
         let mut buf = buf.rewrite(")");
         assert_eq!(parse_token(&mut buf).unwrap(), Token::ClosingParenthesis);
     }
+
     #[test]
     fn test_parse_num() {
         let mut buf = KBuff::with_str("10");
@@ -217,6 +220,7 @@ mod tests {
         let mut buf = buf.rewrite("20");
         assert_eq!(parse_token(&mut buf).unwrap(), Token::Numeric(20.0));
     }
+
     #[test]
     fn test_parse_ops() {
         let mut buf = KBuff::with_str("+");
