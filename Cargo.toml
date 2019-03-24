@@ -5,6 +5,8 @@ authors = ["KevinCybura <KevinCybura@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-
+docopt = "1.0.2"
+serde = "1.0" # if you're using `derive(Deserialize)`
+serde_derive = "1.0" # if you're using `derive(Deserialize)`
 [dev-dependencies]
 uuid = { version = "0.7", features = ["serde", "v4"] }

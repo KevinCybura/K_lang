@@ -1,4 +1,5 @@
-use std::fs::File;
+use std::fs::{File, OpenOptions};
+use std::io::prelude::*;
 use std::io::{BufReader, Error, ErrorKind, Read};
 
 #[derive(PartialEq, Debug, Clone)]
@@ -125,6 +126,37 @@ fn parse_token(buf: &mut KBuff) -> Result<Token, Error> {
     }
 }
 
+fn with_str<'a>(s: &'a str) -> KBuff {
+    let file_name = "temp.k".to_string();
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(file_name.clone())
+        .unwrap();
+    writeln!(file, "{}", s).unwrap();
+    let file = OpenOptions::new()
+        .read(true)
+        .open(file_name.clone())
+        .unwrap();
+    KBuff {
+        cur: ' ',
+        identifier: String::new(),
+        file_name,
+        file: BufReader::new(file),
+    }
+}
+
+pub fn tokenize(s: &str) -> Vec<Token> {
+    let mut buff = with_str(s);
+    let mut ret = Vec::new();
+    while let Ok(tok) = parse_token(&mut buff) {
+        ret.push(tok);
+    }
+    std::fs::remove_file("temp.k");
+
+    ret
+}
+
 pub fn parse(f: String) -> String {
     let mut kbuff = KBuff::new(f);
     while let Ok(tok) = parse_token(&mut kbuff) {
@@ -139,7 +171,6 @@ mod tests {
     use super::*;
     use std::fs::remove_file;
     use std::fs::OpenOptions;
-    use std::io::prelude::*;
     use uuid::Uuid;
 
     impl KBuff {
