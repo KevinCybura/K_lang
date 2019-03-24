@@ -5,6 +5,7 @@ extern crate uuid;
 use std::env;
 
 pub mod ast;
+pub mod lexer;
 pub mod parser;
 
 fn main() {
