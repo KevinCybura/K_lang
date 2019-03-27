@@ -19,16 +19,18 @@ pub enum Token {
 pub struct KBuff<'a> {
     cur: Option<char>,
     chars: Chars<'a>,
-    look_ahead: Option<char>,
 }
 
 impl<'a> KBuff<'a> {
     pub fn new(input: &'a str) -> Self {
         KBuff {
-            cur: input.chars().next(),
+            cur: Some(' '),
             chars: input.chars().to_owned(),
-            look_ahead: None,
         }
+    }
+
+    pub fn tokenize(self) -> Vec<Token> {
+        self.into_iter().map(|token| token).collect()
     }
 
     fn consume(&mut self) -> Option<char> {
@@ -37,11 +39,21 @@ impl<'a> KBuff<'a> {
     }
 
     pub fn next_token(&mut self) -> Token {
-        while let Some(mut cur) = self.consume() {
+        while let Some(cur) = self.cur {
             if cur.is_whitespace() {
+                self.consume();
                 continue;
             }
-            cur = self.look_ahead(cur);
+            // Parse complex tokens.
+            match cur {
+                x if x.is_numeric() => return self.numeric(),
+                x if x.is_alphanumeric() => return self.ident(),
+                x if self.is_op(x) => return self.op(),
+                _ => {}
+            }
+
+            self.consume();
+            // Parse single tokens.
             match cur {
                 ',' => return Token::Comma,
                 '[' => return Token::LBracket,
@@ -49,9 +61,6 @@ impl<'a> KBuff<'a> {
                 '(' => return Token::LParenthesis,
                 ')' => return Token::RParenthesis,
                 ';' => return Token::Delimiter,
-                x if x.is_numeric() => return self.numeric(),
-                x if x.is_alphanumeric() => return self.ident(),
-                x if self.is_op(x) => return self.op(),
                 _ => break,
             }
         }
@@ -61,11 +70,11 @@ impl<'a> KBuff<'a> {
     fn numeric(&mut self) -> Token {
         let mut token = String::new();
         while let Some(cur) = self.cur {
+            self.consume();
             if cur.is_whitespace() || cur.is_alphabetic() {
                 break;
             }
             token.push(cur);
-            self.consume();
         }
 
         Token::Numeric(token.parse().unwrap())
@@ -79,7 +88,7 @@ impl<'a> KBuff<'a> {
             }
 
             if !cur.is_alphanumeric() {
-                self.look_ahead = Some(cur);
+                self.cur = Some(cur);
                 break;
             }
 
@@ -109,16 +118,18 @@ impl<'a> KBuff<'a> {
             _ => false,
         }
     }
-    fn look_ahead(&mut self, c: char) -> char {
-        if let Some(cur) = self.look_ahead {
-            self.cur = self.look_ahead;
-            self.look_ahead = None;
-            return cur;
-        }
-        c
-    }
 }
 
+impl<'a> Iterator for KBuff<'a> {
+    type Item = Token;
+    fn next(&mut self) -> Option<Token> {
+        let token = self.next_token();
+        if token == Token::EOF {
+            return None;
+        }
+        Some(token)
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,11 +184,21 @@ mod tests {
 
     #[test]
     fn test_parse_consecutive_tokens() {
-        let mut buf = KBuff::new("def foo extern, ; ()[]");
+        let mut buf = KBuff::new("def foo(x, y) extern, ; ()[]");
         let tok = buf.next_token();
         assert_eq!(tok, Token::Def);
         let tok = buf.next_token();
         assert_eq!(tok, Token::Ident("foo".to_string()));
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::LParenthesis);
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Ident("x".to_string()));
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Comma);
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Ident("y".to_string()));
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::RParenthesis);
         let tok = buf.next_token();
         assert_eq!(tok, Token::Extern);
         let tok = buf.next_token();
