@@ -130,6 +130,7 @@ impl<'a> Iterator for KBuff<'a> {
         Some(token)
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
