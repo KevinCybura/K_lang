@@ -1,57 +1,106 @@
 pub mod ast;
 use super::lexer::*;
+pub struct ASTNode {}
 
-struct Parser<'a> {
-    lexer: KBuff<'a>,
-    look_ahead: Vec<Token>,
+pub struct Parser {
     parsed_tokens: Vec<Token>,
-    k: usize,
     pos: usize,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(input: &'a str, k: usize) -> Self {
-        let mut lexer = KBuff::new(input);
-        let look_ahead = vec![0; k].into_iter().map(|_| lexer.next_token()).collect();
+impl Parser {
+    pub fn new(lexer: &mut KBuff) -> Self {
+        let parsed_tokens = vec![0; 5].into_iter().map(|_| lexer.next_token()).collect();
         Parser {
-            lexer,
-            look_ahead,
-            parsed_tokens: Vec::new(),
-            k,
+            parsed_tokens,
             pos: 0,
         }
     }
 
-    fn consume(&mut self) {
-        self.look_ahead[self.pos] = self.lexer.next_token();
+    fn consume(&mut self, lexer: &mut KBuff) {
+        self.parsed_tokens[self.pos] = lexer.next_token();
     }
-
-    pub fn LT(&self, i: usize) -> &Token {
-        &self.look_ahead[(self.pos + i - 1) % self.k]
-    }
-
-    pub fn LA(&self, i: usize) -> &Token {
-        self.LT(i)
-    }
-
-    pub fn r#match(&mut self, tok: &Token) {
-        if self.LA(1) == tok {
-            self.consume();
+    fn sync(&mut self, i: usize, lexer: &mut KBuff) {
+        if self.pos + i > self.parsed_tokens.len() {
+            self.fill((self.pos + i - 1) - (self.parsed_tokens.len() - 1), lexer);
         }
     }
 
-    pub fn prototype(&mut self) {
-        if let Token::Ident(name) = self.LA(1) {
-            self.r#match(&Token::Ident(name.to_owned()));
-        }
+    fn fill(&mut self, i: usize, lexer: &mut KBuff) {
+        self.parsed_tokens
+            .extend(vec![0; i].iter().map(|_| lexer.next_token()));
+    }
 
-        if let Token::LParenthesis = self.LA(1) {
-            self.r#match(&Token::LParenthesis);
-        }
+    fn LT(&mut self, i: usize, lexer: &mut KBuff) -> Token {
+        self.sync(i, lexer);
+        self.parsed_tokens[self.pos + i - 1].clone()
+    }
 
+    pub fn LA(&mut self, i: usize, lexer: &mut KBuff) -> Token {
+        self.LT(i, lexer)
+    }
+
+    pub fn r#match(&mut self, tok: &Token, lexer: &mut KBuff) {
+        if self.LA(1, lexer) == *tok {
+            self.consume(lexer);
+        }
+    }
+
+    pub fn parse(&mut self, lexer: &mut KBuff, ast: &Vec<ASTNode>) -> Result<(), String> {
         loop {
+            match self.LA(1, lexer) {
+                Token::Extern => {
+                    self.parse_extern(lexer, ast)?;
+                }
+                Token::Def => {
+                    self.parse_def(lexer, ast)?;
+                }
+                _ => break,
+            }
+        }
+        Ok(())
+    }
 
+    pub fn parse_def(&mut self, lexer: &mut KBuff, ast: &Vec<ASTNode>) -> Result<(), String> {
+        self.consume(lexer);
+        self.prototype(lexer, ast)
+    }
+
+    pub fn parse_extern(&mut self, lexer: &mut KBuff, ast: &Vec<ASTNode>) -> Result<(), String> {
+        self.consume(lexer);
+        self.prototype(lexer, ast)
+    }
+
+    pub fn prototype(&mut self, lexer: &mut KBuff, _ast: &Vec<ASTNode>) -> Result<(), String> {
+        let _name = match self.LA(1, lexer) {
+            Token::Ident(name) => {
+                self.consume(lexer);
+                name
+            }
+            other => return Err(format!("Found {:?}", other)),
+        };
+
+        match self.LA(1, lexer) {
+            Token::LParenthesis => self.consume(lexer),
+            other => return Err(format!("Found {:?}", other)),
         }
 
+        let mut args: Vec<String> = Vec::new();
+        while let Token::Ident(arg) = self.LA(args.len() + 1, lexer) {
+            self.consume(lexer);
+            args.push(arg);
+            match self.LA(1, lexer) {
+                Token::Comma => {
+                    self.consume(lexer);
+                    continue;
+                }
+                _ => break,
+            }
+        }
+
+        match self.LA(args.len(), lexer) {
+            Token::RParenthesis => self.consume(lexer),
+            other => return Err(format!("Found {:?}", other)),
+        }
+        Ok(())
     }
 }

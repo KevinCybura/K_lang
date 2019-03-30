@@ -120,8 +120,11 @@ impl<'a> KBuff<'a> {
     }
 }
 
+
+
 impl<'a> Iterator for KBuff<'a> {
     type Item = Token;
+
     fn next(&mut self) -> Option<Token> {
         let token = self.next_token();
         if token == Token::EOF {
