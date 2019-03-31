@@ -1,57 +1,68 @@
 pub mod ast;
 use super::lexer::*;
 
-struct Parser<'a> {
-    lexer: KBuff<'a>,
-    look_ahead: Vec<Token>,
-    parsed_tokens: Vec<Token>,
-    k: usize,
-    pos: usize,
+#[derive(Debug)]
+pub enum AST {
+    List(Token, Vec<AST>, Token),
+    Element(String),
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(input: &'a str, k: usize) -> Self {
-        let mut lexer = KBuff::new(input);
-        let look_ahead = vec![0; k].into_iter().map(|_| lexer.next_token()).collect();
-        Parser {
-            lexer,
-            look_ahead,
-            parsed_tokens: Vec::new(),
-            k,
-            pos: 0,
-        }
+struct Parser {}
+
+impl<'a> Parser {
+    pub fn new() -> Self {
+        Parser {}
     }
 
-    fn consume(&mut self) {
-        self.look_ahead[self.pos] = self.lexer.next_token();
-    }
-
-    pub fn LT(&self, i: usize) -> &Token {
-        &self.look_ahead[(self.pos + i - 1) % self.k]
-    }
-
-    pub fn LA(&self, i: usize) -> &Token {
-        self.LT(i)
-    }
-
-    pub fn r#match(&mut self, tok: &Token) {
-        if self.LA(1) == tok {
-            self.consume();
-        }
-    }
-
-    pub fn prototype(&mut self) {
-        if let Token::Ident(name) = self.LA(1) {
-            self.r#match(&Token::Ident(name.to_owned()));
-        }
-
-        if let Token::LParenthesis = self.LA(1) {
-            self.r#match(&Token::LParenthesis);
-        }
-
+    fn parse(&self, lexer: &mut KBuff) -> Vec<AST> {
+        let mut ast = Vec::new();
         loop {
-
+            match lexer.next_token() {
+                Token::Ident(name) => ast.push(AST::Element(name)),
+                Token::LBracket => ast.push(self.list(lexer)),
+                Token::EOF => break,
+                _ => {}
+            }
         }
+        ast
+    }
 
+    fn list(&self, lexer: &mut KBuff) -> AST {
+        let mut ast = Vec::new();
+        match self.elements(lexer, &mut ast) {
+            Token::RBracket => {}
+
+            _ => panic!("Expected closing"),
+        }
+        AST::List(Token::RBracket, ast, Token::LBracket)
+    }
+
+    fn elements(&self, lexer: &mut KBuff, ast: &mut Vec<AST>) -> Token {
+        match lexer.next_token() {
+            Token::Ident(name) => ast.push(AST::Element(name.to_owned())),
+            x => panic!("Expected Name found {:?}", x),
+        }
+        while let Token::Comma = lexer.next_token() {
+            match lexer.next_token() {
+                Token::Ident(name) => ast.push(AST::Element(name)),
+                Token::LBracket => ast.push(self.list(lexer)),
+                Token::RBracket => return Token::RBracket,
+                _ => panic!("Expect Comma"),
+            };
+        }
+        Token::RBracket
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::lexer::*;
+
+    #[test]
+    fn test_list() {
+        let parser = Parser::new();
+        let mut lexer = KBuff::new("[ Kevin, Bryan, [ Kevin ] , other]");
+        dbg!(parser.parse(&mut lexer));
     }
 }
