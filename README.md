@@ -1,5 +1,7 @@
 ```
 list	   : '[' elements ']' ;
 elements   : element (',' element)* ;
-element	   : NAME | list ;
+element	   : NAME '=' NAME ;
+	   | NAME
+	   | list
 ```

@@ -17,7 +17,7 @@ pub enum Token {
 
 #[derive(Debug)]
 pub struct KBuff<'a> {
-    cur: Option<char>,
+    pub cur: Option<char>,
     chars: Chars<'a>,
 }
 
@@ -30,7 +30,7 @@ impl<'a> KBuff<'a> {
     }
 
     pub fn tokenize(self) -> Vec<Token> {
-        self.into_iter().map(|token| token).collect()
+        self.map(|token| token).collect()
     }
 
     fn consume(&mut self) -> Option<char> {
@@ -96,9 +96,9 @@ impl<'a> KBuff<'a> {
             self.consume();
         }
         match token.as_str() {
-            "def" => return Token::Def,
-            "extern" => return Token::Extern,
-            _ => return Token::Ident(token),
+            "def" => Token::Def,
+            "extern" => Token::Extern,
+            _ => Token::Ident(token),
         }
     }
 
@@ -115,6 +115,7 @@ impl<'a> KBuff<'a> {
             '-' => true,
             '*' => true,
             '/' => true,
+            '=' => true,
             _ => false,
         }
     }
@@ -224,6 +225,25 @@ mod tests {
         let mut buf = KBuff::new("20");
         let tok = buf.next_token();
         assert_eq!(tok, Token::Numeric(20.));
+        let mut buf = KBuff::new("[ Kevin,  [ Kevin ] , other]");
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::LBracket);
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Ident("Kevin".to_owned()));
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Comma);
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::LBracket);
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Ident("Kevin".to_owned()));
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::RBracket);
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Comma);
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Ident("other".to_owned()));
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::RBracket);
     }
 
     #[test]
@@ -240,5 +260,8 @@ mod tests {
         let mut buf = KBuff::new("/");
         let tok = buf.next_token();
         assert_eq!(tok, Token::Operator("/".to_string()));
+        let mut buf = KBuff::new("=");
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Operator("=".to_string()));
     }
 }
