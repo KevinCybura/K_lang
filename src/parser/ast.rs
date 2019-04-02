@@ -1,4 +1,21 @@
 // use crate::lexer::Token;
+
+#[derive(Debug)]
+pub struct ProtoType {
+    pub func_name: String,
+    pub args: Vec<String>,
+}
+
+impl ProtoType {
+    pub fn new(func_name: String, args: Vec<String>) -> Self {
+        ProtoType { func_name, args }
+    }
+}
+
+#[derive(Debug)]
+pub enum AST {
+    ExternNode(ProtoType),
+}
 // #[derive(PartialEq, Clone, Debug)]
 // pub enum ASTNode {
 //     ExternNode(Prototype),
