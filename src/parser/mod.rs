@@ -2,26 +2,48 @@ pub mod ast;
 use super::lexer::{KBuff, Token, Token::*};
 use ast::{ProtoType, AST, AST::*};
 
-pub struct Parser {
+use std::cell::RefCell;
+
+pub struct Parser<'a> {
     k: usize,
     pos: usize,
     look_ahead: Vec<Token>,
+    lexer: RefCell<KBuff<'a>>,
 }
 
-impl<'a> Parser {
-    pub fn new(k: usize) -> Self {
+macro_rules! expect_token {
+    ($token:tt, $func_name:ident, $parser:ident, $err:expr) => {
+        match $parser.next_token(1) {
+            $token($func_name) => {
+                $parser.consume();
+                $func_name
+            }
+            _ => panic!($err),
+        };
+    };
+    ($token:tt, $parser:ident, $err:expr) => {
+        match $parser.next_token(1) {
+            $token => $parser.consume(),
+            _ => panic!($err),
+        };
+    };
+}
+
+impl<'a> Parser<'a> {
+    pub fn new(k: usize, lexer: KBuff<'a>) -> Self {
         Parser {
             k,
             pos: 0,
             look_ahead: Vec::new(),
+            lexer: RefCell::new(lexer),
         }
     }
 
-    pub fn fill_look_ahead(&mut self, lexer: &mut KBuff) {
+    pub fn fill_look_ahead(&mut self) {
         self.look_ahead.append(
             &mut vec![0; self.k]
                 .into_iter()
-                .map(|_| lexer.next_token())
+                .map(|_| self.lexer.borrow_mut().next_token())
                 .collect::<Vec<Token>>(),
         );
     }
@@ -30,135 +52,47 @@ impl<'a> Parser {
         self.look_ahead[(self.pos + i - 1) % self.k].clone()
     }
 
-    fn consume(&mut self, lexer: &mut KBuff) {
-        self.look_ahead[self.pos] = lexer.next_token();
+    fn consume(&mut self) {
+        self.look_ahead[self.pos] = self.lexer.borrow_mut().next_token();
         self.pos = (self.pos + 1) % self.k;
     }
+}
 
-    pub fn parse(&mut self, lexer: &mut KBuff) -> Vec<AST> {
-        self.fill_look_ahead(lexer);
-        let mut ast = Vec::new();
-        loop {
-            match (self.next_token(1), self.next_token(2)) {
-                _ => {}
-            }
-
-            match self.next_token(1) {
-                Extern => ast.push(self.parse_extern(lexer)),
-                _ => break,
-            }
+pub fn parse(parser: &mut Parser) -> Vec<AST> {
+    parser.fill_look_ahead();
+    let mut ast = Vec::new();
+    loop {
+        match (parser.next_token(1), parser.next_token(2)) {
+            _ => {}
         }
-        ast
+
+        match parser.next_token(1) {
+            Extern => ast.push(parse_extern(parser)),
+            _ => break,
+        }
+    }
+    ast
+}
+
+fn parse_extern(parser: &mut Parser) -> AST {
+    parser.consume();
+
+    let name = expect_token!(Ident, func_name, parser, "Expected function name");
+    expect_token!(LParenthesis, parser, "Expected Left paren");
+
+    let mut args = Vec::new();
+    args.push(expect_token!(Ident, arg, parser, "Expected Arg"));
+
+    while let Comma = parser.next_token(1) {
+        parser.consume();
+
+        args.push(expect_token!(Ident, arg, parser, "Expected Arg"));
     }
 
-    fn parse_extern(&mut self, lexer: &mut KBuff) -> AST {
-        self.consume(lexer);
-        let name = match self.next_token(1) {
-            Ident(func_name) => func_name,
-            x => panic!("Expected function name found {:?}", x),
-        };
-        self.consume(lexer);
+    parser.consume();
+    expect_token!(RParenthesis, parser, "Expected Right paren");
 
-        match self.next_token(1) {
-            LParenthesis => {}
-            x => panic!("Expected opening paren found {:?}", x),
-        }
-        self.consume(lexer);
-
-        let mut args = Vec::new();
-        match self.next_token(1) {
-            Ident(arg) => args.push(arg),
-            x => panic!("Expected argument found {:?}", x),
-        }
-        self.consume(lexer);
-        while let Comma = self.next_token(1) {
-            self.consume(lexer);
-            let mut args = Vec::new();
-            match self.next_token(1) {
-                Ident(arg) => args.push(arg),
-                x => panic!("Expected argument found {:?}", x),
-            }
-            self.consume(lexer);
-        }
-
-        match self.next_token(1) {
-            RParenthesis => {}
-            x => panic!("Expected opening paren found {:?}", x),
-        }
-        self.consume(lexer);
-
-        ExternNode(ProtoType::new(name, args))
-    }
-
-    // pub fn parse(&mut self, lexer: &mut KBuff) -> Vec<AST> {
-    //     self.fill_look_ahead(lexer);
-    //     let mut ast = Vec::new();
-    //     loop {
-    //         match (self.next_token(1), self.next_token(2)) {
-    //             (Token::Ident(ref name), Token::Operator(ref op)) if op == "=" => {
-    //                 ast.push(self.assigment(lexer, name.to_owned()))
-    //             }
-    //             _ => {}
-    //         }
-
-    //         match self.next_token(1) {
-    //             Token::LBracket => ast.push(self.list(lexer)),
-    //             Token::Ident(name) => {
-    //                 ast.push(self.name(lexer, name));
-    //             }
-    //             Token::EOF => break,
-    //             _ => panic!(),
-    //         }
-    //     }
-    //     ast
-    // }
-    // fn name(&mut self, lexer: &mut KBuff, name: String) -> AST {
-    //     self.consume(lexer);
-    //     AST::Element(name)
-    // }
-    // fn assigment(&mut self, lexer: &mut KBuff, ident: String) -> AST {
-    //     self.consume(lexer);
-    //     self.consume(lexer);
-    //     match self.next_token(1) {
-    //         Token::Ident(name) => {
-    //             self.consume(lexer);
-    //             AST::Assignment(ident, Token::Operator("=".to_owned()), name)
-    //         }
-    //         _ => panic!(),
-    //     }
-    // }
-
-    // fn list(&mut self, lexer: &mut KBuff) -> AST {
-    //     self.consume(lexer);
-    //     let mut ast = Vec::new();
-    //     self.elements(lexer, &mut ast);
-    //     match self.next_token(1) {
-    //         Token::RBracket => {}
-    //         _ => panic!("Expected closing"),
-    //     }
-    //     self.consume(lexer);
-    //     AST::List(Token::LBracket, ast, Token::RBracket)
-    // }
-
-    // fn elements(&mut self, lexer: &mut KBuff, ast: &mut Vec<AST>) {
-    //     match self.next_token(1) {
-    //         Token::Ident(name) => {
-    //             self.consume(lexer);
-    //             ast.push(AST::Element(name.to_owned()))
-    //         }
-    //         Token::RBracket => return,
-    //         x => panic!("Expected Name found {:?}", x),
-    //     }
-    //     while let Token::Comma = self.next_token(1) {
-    //         self.consume(lexer);
-    //         match self.next_token(1) {
-    //             Token::LBracket => ast.push(self.list(lexer)),
-    //             Token::Ident(name) => ast.push(self.name(lexer, name)),
-    //             Token::RBracket => return,
-    //             x => panic!("Expect Comma: {:?}", x),
-    //         };
-    //     }
-    // }
+    ExternNode(ProtoType::new(name, args))
 }
 
 #[cfg(test)]
