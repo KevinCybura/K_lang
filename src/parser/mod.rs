@@ -25,24 +25,6 @@ macro_rules! expect {
     };
 }
 
-macro_rules! expect_token {
-    ($token:tt, $func_name:ident, $parser:ident, $err:expr) => {
-        match $parser.next_token(1) {
-            $token($func_name) => {
-                $parser.consume();
-                $func_name
-            }
-            _ => panic!($err),
-        };
-    };
-    ($token:tt, $parser:ident, $err:expr) => {
-        match $parser.next_token(1) {
-            $token => $parser.consume(),
-            _ => panic!($err),
-        };
-    };
-}
-
 impl<'a> Parser<'a> {
     pub fn new(k: usize, lexer: KBuff<'a>) -> Self {
         Parser {
@@ -82,15 +64,35 @@ pub fn parse(parser: &mut Parser) -> Vec<AST> {
 
         match parser.next_token(1) {
             Extern => ast.push(parse_extern(parser)),
+            // Def => ast.push(parse_def(parser)),
             _ => break,
         }
     }
     ast
 }
 
+fn parse_def(parser: &mut Parser) -> AST {
+    parser.consume();
+    let prototype = parse_prototype(parser);
+
+    let expression = parse_expr(parser);
+
+    ExternNode(prototype)
+}
+
+fn parse_expr(parser: &mut Parser) -> AST {
+
+    let exper = expect!()
+}
+
 fn parse_extern(parser: &mut Parser) -> AST {
     parser.consume();
+    let proto = parse_prototype(parser);
 
+    ExternNode(proto)
+}
+
+fn parse_prototype(parser: &mut Parser) -> ProtoType {
     // let name = expect_token!(Ident, func_name, parser, "Expected function name");
     let name = expect!([Ident(name), name] <= parser, "Expected function name");
     expect!(
@@ -107,7 +109,7 @@ fn parse_extern(parser: &mut Parser) -> AST {
         )
     }
 
-    ExternNode(ProtoType::new(name, args))
+    ProtoType::new(name, args)
 }
 
 #[cfg(test)]
@@ -116,10 +118,27 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_list() {
-        let mut lexer = KBuff::new("extern foo(x, y)");
+    fn test_parse_prototype() {
+        // Prototype  : Ident OpeningParenthesis [Ident Comma ?]* ClosingParenthesis;
+        let lexer = KBuff::new("foo(x, y)");
         let mut parser = Parser::new(4, lexer);
+        parser.fill_look_ahead();
+        let x = ProtoType::new("foo".to_owned(), vec!["x".to_owned(), "y".to_owned()]);
 
-        dbg!(parse(&mut parser));
+        assert_eq!(x, parse_prototype(&mut parser));
+    }
+
+    #[test]
+    fn test_parse_extern() {
+        //declaration : Extern prototype;
+        let lexer = KBuff::new("extern foo(x, y)");
+        let mut parser = Parser::new(4, lexer);
+        parser.fill_look_ahead();
+        let x = ExternNode(ProtoType::new(
+            "foo".to_owned(),
+            vec!["x".to_owned(), "y".to_owned()],
+        ));
+
+        assert_eq!(x, parse_extern(&mut parser));
     }
 }
