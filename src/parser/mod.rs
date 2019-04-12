@@ -11,6 +11,20 @@ pub struct Parser<'a> {
     lexer: RefCell<KBuff<'a>>,
 }
 
+macro_rules! expect {
+    ( [$($token:pat,  $result:stmt);+ ] <= $parser:ident,  $err:expr) => {
+        match $parser.next_token(1) {
+            $(
+                $token => {
+                $parser.consume();
+                $result
+            }
+            )+
+                _ => panic!($err),
+        }
+    };
+}
+
 macro_rules! expect_token {
     ($token:tt, $func_name:ident, $parser:ident, $err:expr) => {
         match $parser.next_token(1) {
@@ -77,106 +91,35 @@ pub fn parse(parser: &mut Parser) -> Vec<AST> {
 fn parse_extern(parser: &mut Parser) -> AST {
     parser.consume();
 
-    let name = expect_token!(Ident, func_name, parser, "Expected function name");
-    expect_token!(LParenthesis, parser, "Expected Left paren");
+    // let name = expect_token!(Ident, func_name, parser, "Expected function name");
+    let name = expect!([Ident(name), name] <= parser, "Expected function name");
+    expect!(
+        [LParenthesis, LParenthesis] <= parser,
+        "Expected Open parenthesis"
+    );
 
     let mut args = Vec::new();
-    args.push(expect_token!(Ident, arg, parser, "Expected Arg"));
-
-    while let Comma = parser.next_token(1) {
-        parser.consume();
-
-        args.push(expect_token!(Ident, arg, parser, "Expected Arg"));
+    loop {
+        expect!(
+        [Ident(arg), args.push(arg);
+         Comma, continue ;
+         RParenthesis, break] <= parser, "Expected Closing Paren"
+        )
     }
-
-    parser.consume();
-    expect_token!(RParenthesis, parser, "Expected Right paren");
 
     ExternNode(ProtoType::new(name, args))
 }
 
 #[cfg(test)]
 mod test {
-    // use super::AST::*;
-    // use super::*;
+    use super::AST::*;
+    use super::*;
 
     #[test]
     fn test_list() {
-        /*         let mut parser = Parser::new(4); */
-        // let mut lexer = KBuff::new("[ Kevin, other , other]");
-        // assert_eq!(
-        //     vec![List(
-        //         Token::LBracket,
-        //         vec![
-        //             Element("Kevin".to_owned()),
-        //             Element("other".to_owned()),
-        //             Element("other".to_owned())
-        //         ],
-        //         Token::RBracket
-        //     )],
-        //     parser.parse(&mut lexer)
-        // );
-        // let mut parser = Parser::new(4);
-        // let mut lexer = KBuff::new("[ Kevin, other,  [ Kevin ], other]");
-        // assert_eq!(
-        //     vec![List(
-        //         Token::LBracket,
-        //         vec![
-        //             Element("Kevin".to_owned()),
-        //             Element("other".to_owned()),
-        //             List(
-        //                 Token::LBracket,
-        //                 vec![Element("Kevin".to_owned())],
-        //                 Token::RBracket
-        //             ),
-        //             Element("other".to_owned())
-        //         ],
-        //         Token::RBracket
-        //     )],
-        //     parser.parse(&mut lexer)
-        // );
-        // let mut parser = Parser::new(4);
-        // let mut lexer = KBuff::new("[ Kevin, other,  [ Kevin ], [other, [] ] ]");
-        // assert_eq!(
-        //     vec![List(
-        //         Token::LBracket,
-        //         vec![
-        //             Element("Kevin".to_owned()),
-        //             Element("other".to_owned()),
-        //             List(
-        //                 Token::LBracket,
-        //                 vec![Element("Kevin".to_owned())],
-        //                 Token::RBracket
-        //             ),
-        //             List(
-        //                 Token::LBracket,
-        //                 vec![
-        //                     Element("other".to_owned()),
-        //                     List(Token::LBracket, vec![], Token::RBracket)
-        //                 ],
-        //                 Token::RBracket
-        //             ),
-        //         ],
-        //         Token::RBracket
-        //     )],
-        //     parser.parse(&mut lexer)
-        // );
-        // let mut parser = Parser::new(4);
-        // let mut lexer = KBuff::new("[]");
-        // assert_eq!(
-        //     vec![List(Token::LBracket, vec![], Token::RBracket)],
-        //     parser.parse(&mut lexer)
-        // );
+        let mut lexer = KBuff::new("extern foo(x, y)");
+        let mut parser = Parser::new(4, lexer);
 
-        // let mut parser = Parser::new(4);
-        // let mut lexer = KBuff::new("Kevin = Kevin");
-        // assert_eq!(
-        //     vec![Assignment(
-        //         "Kevin".to_owned(),
-        //         Token::Operator("=".to_owned()),
-        //         "Kevin".to_owned()
-        //     )],
-        //     parser.parse(&mut lexer)
-        /* ); */
+        dbg!(parse(&mut parser));
     }
 }
