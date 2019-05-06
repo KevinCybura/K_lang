@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter, Result};
 use std::str::Chars;
 #[derive(PartialEq, Debug, Clone)]
 pub enum Token {
@@ -13,6 +14,27 @@ pub enum Token {
     Numeric(f64),
     Operator(String),
     EOF,
+}
+
+pub struct Tok {
+    token: Token,
+    lexeme: String,
+    line: usize,
+}
+
+impl Debug for Tok {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "{:?}", &self.to_string())
+    }
+}
+
+impl ToString for Tok {
+    fn to_string(&self) -> String {
+        format!(
+            "<| type: {:?} + raw: {:?} + line: {:?} |>",
+            self.token, self.lexeme, self.line
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -44,29 +66,38 @@ impl<'a> KBuff<'a> {
                 self.consume();
                 continue;
             }
-            // Parse complex tokens.
-            match cur {
+
+            let token = match cur {
+                // Parse complex tokens.
                 x if x.is_numeric() => return self.numeric(),
                 x if x.is_alphanumeric() => return self.ident(),
-                x if self.is_op(x) => return self.op(),
-                _ => {}
-            }
+                // Parse operators
+                '+' => self.op(cur),
+                '-' => self.op(cur),
+                '*' => self.op(cur),
+                '/' => self.op(cur),
+                '!' => self.op(cur),
+                '<' => self.op(cur),
+                '>' => self.op(cur),
+                '=' => self.op(cur),
 
+                // Parse single tokens.
+                ',' => Token::Comma,
+                '[' => Token::LBracket,
+                ']' => Token::RBracket,
+                '(' => Token::LParenthesis,
+                ')' => Token::RParenthesis,
+                ';' => Token::Delimiter,
+                '\0' => break,
+                _ => panic!("Error found {:?}", cur),
+            };
             self.consume();
-            // Parse single tokens.
-            match cur {
-                ',' => return Token::Comma,
-                '[' => return Token::LBracket,
-                ']' => return Token::RBracket,
-                '(' => return Token::LParenthesis,
-                ')' => return Token::RParenthesis,
-                ';' => return Token::Delimiter,
-                _ => break,
-            }
+            return token;
         }
         Token::EOF
     }
 
+    #[inline]
     fn numeric(&mut self) -> Token {
         let mut token = String::new();
         while let Some(cur) = self.cur {
@@ -80,6 +111,7 @@ impl<'a> KBuff<'a> {
         Token::Numeric(token.parse().unwrap())
     }
 
+    #[inline]
     fn ident(&mut self) -> Token {
         let mut token = String::new();
         while let Some(cur) = self.cur {
@@ -102,22 +134,21 @@ impl<'a> KBuff<'a> {
         }
     }
 
-    fn op(&mut self) -> Token {
+    #[inline]
+    fn op(&mut self, cur: char) -> Token {
+        self.consume();
         let mut token = String::new();
-        token.push(self.cur.unwrap());
+        token.push(cur);
+        match (cur, self.cur) {
+            ('=', Some('=')) => token.push('='),
+            ('!', Some('=')) => token.push('='),
+            ('>', Some('=')) => token.push('='),
+            ('<', Some('=')) => token.push('='),
+            _ => return Token::Operator(token),
+        }
+
         self.consume();
         Token::Operator(token)
-    }
-
-    fn is_op(&self, op: char) -> bool {
-        match op {
-            '+' => true,
-            '-' => true,
-            '*' => true,
-            '/' => true,
-            '=' => true,
-            _ => false,
-        }
     }
 }
 
@@ -247,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_ops() {
+    fn test_parse_single_char_ops() {
         let mut buf = KBuff::new("+");
         let tok = buf.next_token();
         assert_eq!(tok, Token::Operator("+".to_string()));
@@ -263,5 +294,23 @@ mod tests {
         let mut buf = KBuff::new("=");
         let tok = buf.next_token();
         assert_eq!(tok, Token::Operator("=".to_string()));
+    }
+
+    #[test]
+    fn test_parse_mutli_char_ops() {
+        let mut buf = KBuff::new("!=");
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Operator("!=".to_string()));
+        let mut buf = KBuff::new("==");
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Operator("==".to_string()));
+
+        let mut buf = KBuff::new("1 != 2");
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Numeric(1.));
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Operator("!=".to_string()));
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Numeric(2.));
     }
 }

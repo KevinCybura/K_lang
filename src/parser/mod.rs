@@ -75,15 +75,16 @@ fn parse_def(parser: &mut Parser) -> AST {
     parser.consume();
     let prototype = parse_prototype(parser);
 
-    let expression = parse_expr(parser);
+    // let expression = parse_expr(parser);
 
     ExternNode(prototype)
 }
 
-fn parse_expr(parser: &mut Parser) -> AST {
+// fn parse_expr(parser: &mut Parser) -> AST {
 
-    let exper = expect!()
-}
+//     // let exper = expect!()
+
+// }
 
 fn parse_extern(parser: &mut Parser) -> AST {
     parser.consume();
@@ -118,12 +119,22 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_parse_prototype() {
+    fn test_parse_prototype_with_args() {
         // Prototype  : Ident OpeningParenthesis [Ident Comma ?]* ClosingParenthesis;
         let lexer = KBuff::new("foo(x, y)");
         let mut parser = Parser::new(4, lexer);
         parser.fill_look_ahead();
         let x = ProtoType::new("foo".to_owned(), vec!["x".to_owned(), "y".to_owned()]);
+
+        assert_eq!(x, parse_prototype(&mut parser));
+    }
+
+    #[test]
+    fn test_parse_prototype_no_args() {
+        let lexer = KBuff::new("foo()");
+        let mut parser = Parser::new(4, lexer);
+        parser.fill_look_ahead();
+        let x = ProtoType::new("foo".to_owned(), vec![]);
 
         assert_eq!(x, parse_prototype(&mut parser));
     }
