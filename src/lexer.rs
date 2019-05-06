@@ -12,6 +12,7 @@ pub enum Token {
     Comma,
     Comment,
     Ident(String),
+    Str(String),
     Numeric(f64),
     Operator(String),
     EOF,
@@ -72,7 +73,9 @@ impl<'a> KBuff<'a> {
                 // Parse complex tokens.
                 x if x.is_numeric() => return self.numeric(),
                 x if x.is_alphanumeric() => return self.ident(),
-                // Parse operators
+                // Parse strings.
+                '"' => self.string(),
+                // Parse operators.
                 '+' => self.op(cur),
                 '-' => self.op(cur),
                 '*' => self.op(cur),
@@ -120,7 +123,7 @@ impl<'a> KBuff<'a> {
                 break;
             }
 
-            if !cur.is_alphanumeric() {
+            if !cur.is_alphanumeric() && cur != '_' {
                 self.cur = Some(cur);
                 break;
             }
@@ -133,6 +136,23 @@ impl<'a> KBuff<'a> {
             "extern" => Token::Extern,
             _ => Token::Ident(token),
         }
+    }
+
+    #[inline]
+    fn string(&mut self) -> Token {
+        self.consume();
+        let mut token = String::new();
+        loop {
+            if let Some('"') = self.cur {
+                break;
+            } else if let Some('\0') = self.cur {
+                panic!("Missing end of string literal");
+            }
+            token.push(self.cur.unwrap());
+            self.consume();
+        }
+        self.consume();
+        Token::Str(token)
     }
 
     #[inline]
@@ -312,6 +332,25 @@ mod tests {
         let mut buf = KBuff::new("=");
         let tok = buf.next_token();
         assert_eq!(tok, Token::Operator("=".to_string()));
+    }
+
+    #[test]
+    fn test_parse_string() {
+        let mut buf = KBuff::new("\"HelloWorld\"");
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Str("HelloWorld".to_owned()));
+
+        let mut buf = KBuff::new("def hello_world() \"HelloWorld\"");
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Def);
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Ident("hello_world".to_owned()));
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::LParenthesis);
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::RParenthesis);
+        let tok = buf.next_token();
+        assert_eq!(tok, Token::Str("HelloWorld".to_owned()));
     }
 
     #[test]
