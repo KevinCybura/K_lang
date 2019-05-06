@@ -10,6 +10,7 @@ pub enum Token {
     LBracket,
     RBracket,
     Comma,
+    Comment,
     Ident(String),
     Numeric(f64),
     Operator(String),
@@ -75,11 +76,11 @@ impl<'a> KBuff<'a> {
                 '+' => self.op(cur),
                 '-' => self.op(cur),
                 '*' => self.op(cur),
-                '/' => self.op(cur),
                 '!' => self.op(cur),
                 '<' => self.op(cur),
                 '>' => self.op(cur),
                 '=' => self.op(cur),
+                '/' => self.op_or_comment(cur),
 
                 // Parse single tokens.
                 ',' => Token::Comma,
@@ -149,6 +150,23 @@ impl<'a> KBuff<'a> {
 
         self.consume();
         Token::Operator(token)
+    }
+
+    #[inline]
+    fn op_or_comment(&mut self, cur: char) -> Token {
+        self.consume();
+        let mut token = String::new();
+        token.push(cur);
+        match self.cur {
+            Some('/') => token.push('/'),
+            _ => return Token::Operator(token),
+        }
+        loop {
+            if let Some('\n') | Some('\0') = self.consume() {
+                break;
+            }
+        }
+        Token::Comment
     }
 }
 
