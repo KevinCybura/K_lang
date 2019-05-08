@@ -1,5 +1,8 @@
 use std::fmt::{Debug, Formatter, Result};
 use std::str::Chars;
+
+// type CharIter<'a> = Peekable<Chars<'a>>;
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum Token {
     Def,
@@ -12,7 +15,7 @@ pub enum Token {
     Comma,
     Comment,
     Ident(String),
-    Str(String),
+    String(String),
     Numeric(f64),
     Operator(String),
     EOF,
@@ -49,7 +52,7 @@ impl<'a> KBuff<'a> {
     pub fn new(input: &'a str) -> Self {
         KBuff {
             cur: Some(' '),
-            chars: input.chars().to_owned(),
+            chars: input.chars(),
         }
     }
 
@@ -106,9 +109,26 @@ impl<'a> KBuff<'a> {
         let mut token = String::new();
         while let Some(cur) = self.cur {
             self.consume();
-            if cur.is_whitespace() || cur.is_alphabetic() {
+            // Floating point number.
+            if cur == '.' && !self.peek().is_numeric() {
+                // TODO: This would be a function call on a number, handle accordingly.
+                // Ex: 144.sqrt()
+                break;
+            } else if cur == '.' {
+                token.push(cur);
+                continue;
+            }
+
+            // Finished parsing number.
+            if cur.is_whitespace() {
                 break;
             }
+
+            // Error only allow numbers for numeric tokens.
+            if !cur.is_numeric() {
+                panic!("Error: found {:?} when parsing number", cur);
+            }
+
             token.push(cur);
         }
 
@@ -143,16 +163,16 @@ impl<'a> KBuff<'a> {
         self.consume();
         let mut token = String::new();
         loop {
-            if let Some('"') = self.cur {
+            if self.peek() == '"' {
                 break;
-            } else if let Some('\0') = self.cur {
+            } else if self.peek() == '\0' {
                 panic!("Missing end of string literal");
             }
             token.push(self.cur.unwrap());
             self.consume();
         }
         self.consume();
-        Token::Str(token)
+        Token::String(token)
     }
 
     #[inline]
@@ -160,11 +180,11 @@ impl<'a> KBuff<'a> {
         self.consume();
         let mut token = String::new();
         token.push(cur);
-        match (cur, self.cur) {
-            ('=', Some('=')) => token.push('='),
-            ('!', Some('=')) => token.push('='),
-            ('>', Some('=')) => token.push('='),
-            ('<', Some('=')) => token.push('='),
+        match (cur, self.peek()) {
+            ('=', '=') => token.push('='),
+            ('!', '=') => token.push('='),
+            ('>', '=') => token.push('='),
+            ('<', '=') => token.push('='),
             _ => return Token::Operator(token),
         }
 
@@ -177,8 +197,8 @@ impl<'a> KBuff<'a> {
         self.consume();
         let mut token = String::new();
         token.push(cur);
-        match self.cur {
-            Some('/') => token.push('/'),
+        match self.peek() {
+            '/' => token.push('/'),
             _ => return Token::Operator(token),
         }
         loop {
@@ -187,6 +207,11 @@ impl<'a> KBuff<'a> {
             }
         }
         Token::Comment
+    }
+
+    #[inline]
+    fn peek(&self) -> char {
+        self.cur.unwrap_or('\0')
     }
 }
 
@@ -294,25 +319,28 @@ mod tests {
         let mut buf = KBuff::new("20");
         let tok = buf.next_token();
         assert_eq!(tok, Token::Numeric(20.));
-        let mut buf = KBuff::new("[ Kevin,  [ Kevin ] , other]");
+        let mut buf = KBuff::new("20.");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::LBracket);
+        assert_eq!(tok, Token::Numeric(20.));
+        let mut buf = KBuff::new("0.20");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::Ident("Kevin".to_owned()));
+        assert_eq!(tok, Token::Numeric(0.20));
+        let mut buf = KBuff::new("23.4");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::Comma);
-        let tok = buf.next_token();
-        assert_eq!(tok, Token::LBracket);
-        let tok = buf.next_token();
-        assert_eq!(tok, Token::Ident("Kevin".to_owned()));
-        let tok = buf.next_token();
-        assert_eq!(tok, Token::RBracket);
-        let tok = buf.next_token();
-        assert_eq!(tok, Token::Comma);
-        let tok = buf.next_token();
-        assert_eq!(tok, Token::Ident("other".to_owned()));
-        let tok = buf.next_token();
-        assert_eq!(tok, Token::RBracket);
+        assert_eq!(tok, Token::Numeric(23.4));
+    }
+
+    #[test]
+    fn test_invalid_float_number() {
+        let mut buf = KBuff::new(".10");
+        let result = std::panic::catch_unwind(move || buf.next_token());
+        assert!(result.is_err());
+        let mut buf = KBuff::new("1k0");
+        let result = std::panic::catch_unwind(move || buf.next_token());
+        assert!(result.is_err());
+        let mut buf = KBuff::new(".1k0");
+        let result = std::panic::catch_unwind(move || buf.next_token());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -338,7 +366,7 @@ mod tests {
     fn test_parse_string() {
         let mut buf = KBuff::new("\"HelloWorld\"");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::Str("HelloWorld".to_owned()));
+        assert_eq!(tok, Token::String("HelloWorld".to_owned()));
 
         let mut buf = KBuff::new("def hello_world() \"HelloWorld\"");
         let tok = buf.next_token();
@@ -350,7 +378,7 @@ mod tests {
         let tok = buf.next_token();
         assert_eq!(tok, Token::RParenthesis);
         let tok = buf.next_token();
-        assert_eq!(tok, Token::Str("HelloWorld".to_owned()));
+        assert_eq!(tok, Token::String("HelloWorld".to_owned()));
     }
 
     #[test]
