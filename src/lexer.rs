@@ -1,8 +1,6 @@
 use std::fmt::{Debug, Formatter, Result};
 use std::str::Chars;
 
-// type CharIter<'a> = Peekable<Chars<'a>>;
-
 #[derive(PartialEq, Debug, Clone)]
 pub enum Token {
     Def,
