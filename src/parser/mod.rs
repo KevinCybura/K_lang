@@ -1,5 +1,5 @@
 pub mod ast;
-use super::lexer::{KBuff, Token, Token::*};
+use super::lexer::{KBuff, Token, TokenType::*};
 use ast::{ProtoType, AST, AST::*};
 
 use std::cell::RefCell;
@@ -13,7 +13,7 @@ pub struct Parser<'a> {
 
 macro_rules! expect {
     ( [$($token:pat,  $result:stmt);+ ] <= $parser:ident,  $err:expr) => {
-        match $parser.next_token(1) {
+        match $parser.next_token(1).r#type {
             $(
                 $token => {
                 $parser.consume();
@@ -62,7 +62,7 @@ pub fn parse(parser: &mut Parser) -> Vec<AST> {
             _ => {}
         }
 
-        match parser.next_token(1) {
+        match parser.next_token(1).r#type {
             Extern => ast.push(parse_extern(parser)),
             // Def => ast.push(parse_def(parser)),
             _ => break,
@@ -95,7 +95,10 @@ fn parse_extern(parser: &mut Parser) -> AST {
 
 fn parse_prototype(parser: &mut Parser) -> ProtoType {
     // let name = expect_token!(Ident, func_name, parser, "Expected function name");
-    let name = expect!([Ident(name), name] <= parser, "Expected function name");
+    let name = expect!(
+        [Ident { lexeme: name }, name] <= parser,
+        "Expected function name"
+    );
     expect!(
         [LParenthesis, LParenthesis] <= parser,
         "Expected Open parenthesis"
@@ -104,7 +107,7 @@ fn parse_prototype(parser: &mut Parser) -> ProtoType {
     let mut args = Vec::new();
     loop {
         expect!(
-        [Ident(arg), args.push(arg);
+        [Ident{lexeme: arg}, args.push(arg);
          Comma, continue ;
          RParenthesis, break] <= parser, "Expected Closing Paren"
         )
