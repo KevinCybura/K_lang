@@ -1,19 +1,20 @@
-// use crate::lexer::Token;
+use crate::lexer::Token;
 
 #[derive(Debug, PartialEq)]
 pub enum AST {
     ExternNode(ProtoType),
     FunctionNode(Function),
+    Expr(Expression),
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct ProtoType {
-    pub func_name: String,
-    pub args: Vec<String>,
+    pub func_name: Token,
+    pub args: Vec<Token>,
 }
 
 impl ProtoType {
-    pub fn new(func_name: String, args: Vec<String>) -> Self {
+    pub fn new(func_name: Token, args: Vec<Token>) -> Self {
         ProtoType { func_name, args }
     }
 }
@@ -32,9 +33,11 @@ impl Function {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Expression {
-    LiteralEpxr(f64),
-    VariableExpr(String),
+    LiteralEpxr(Token),
+    BoolEpxr(bool),
+    VariableExpr(Token),
     BinaryExpr(String, Box<Expression>, Box<Expression>),
+    UnaryExpr(String, Box<Expression>),
     CallExpr(String, Vec<Expression>),
 }
 
