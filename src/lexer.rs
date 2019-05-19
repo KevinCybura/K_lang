@@ -11,24 +11,26 @@ pub enum TokenType {
     LBracket,
     RBracket,
     Comma,
-    Comment { lexeme: String },
-    Ident { lexeme: String },
-    String { lexeme: String },
-    Numeric { lexeme: String },
-    Operator { lexeme: String },
+    Comment,
+    Ident,
+    String,
+    Numeric,
+    Operator,
     EOF,
 }
 
 #[derive(PartialEq, Clone)]
 pub struct Token {
-    pub r#type: TokenType,
+    pub token_t: TokenType,
+    pub lexeme: String,
     pub line: usize,
 }
 
 impl Token {
-    fn new(token: TokenType, line: usize) -> Self {
+    pub fn new(token_t: TokenType, lexeme: String, line: usize) -> Self {
         Token {
-            r#type: token,
+            token_t,
+            lexeme,
             line,
         }
     }
@@ -42,7 +44,7 @@ impl Debug for Token {
 
 impl ToString for Token {
     fn to_string(&self) -> String {
-        format!("<| type: {:?} +  line: {:?} |>", self.r#type, self.line)
+        format!("<| type: {:?} +  line: {:?} |>", self.token_t, self.line)
     }
 }
 
@@ -94,19 +96,19 @@ impl<'a> KBuff<'a> {
                 '/' => self.op_or_comment(cur),
 
                 // Parse single tokens.
-                ',' => Token::new(Comma, 0),
-                '[' => Token::new(LBracket, 0),
-                ']' => Token::new(RBracket, 0),
-                '(' => Token::new(LParenthesis, 0),
-                ')' => Token::new(RParenthesis, 0),
-                ';' => Token::new(Delimiter, 0),
+                ',' => Token::new(Comma, "".to_owned(), 0),
+                '[' => Token::new(LBracket, "".to_owned(), 0),
+                ']' => Token::new(RBracket, "".to_owned(), 0),
+                '(' => Token::new(LParenthesis, "".to_owned(), 0),
+                ')' => Token::new(RParenthesis, "".to_owned(), 0),
+                ';' => Token::new(Delimiter, "".to_owned(), 0),
                 '\0' => break,
                 _ => panic!("Error found {:?}", cur),
             };
             self.consume();
             return token;
         }
-        Token::new(EOF, 0)
+        Token::new(EOF, "".to_owned(), 0)
     }
 
     #[inline]
@@ -137,7 +139,7 @@ impl<'a> KBuff<'a> {
             lexeme.push(cur);
         }
 
-        Token::new(TokenType::Numeric { lexeme }, 0)
+        Token::new(TokenType::Numeric, lexeme, 0)
     }
 
     #[inline]
@@ -157,9 +159,9 @@ impl<'a> KBuff<'a> {
             self.consume();
         }
         match lexeme.as_str() {
-            "def" => Token::new(TokenType::Def, 0),
-            "extern" => Token::new(TokenType::Extern, 0),
-            _ => Token::new(TokenType::Ident { lexeme }, 0),
+            "def" => Token::new(TokenType::Def, "".to_owned(), 0),
+            "extern" => Token::new(TokenType::Extern, "".to_owned(), 0),
+            _ => Token::new(TokenType::Ident, lexeme, 0),
         }
     }
 
@@ -177,7 +179,7 @@ impl<'a> KBuff<'a> {
             self.consume();
         }
         self.consume();
-        Token::new(TokenType::String { lexeme }, 0)
+        Token::new(TokenType::String, lexeme, 0)
     }
 
     #[inline]
@@ -190,11 +192,11 @@ impl<'a> KBuff<'a> {
             ('!', '=') => lexeme.push('='),
             ('>', '=') => lexeme.push('='),
             ('<', '=') => lexeme.push('='),
-            _ => return Token::new(TokenType::Operator { lexeme }, 0),
+            _ => return Token::new(TokenType::Operator, lexeme, 0),
         }
 
         self.consume();
-        Token::new(TokenType::Operator { lexeme }, 0)
+        Token::new(TokenType::Operator, lexeme, 0)
     }
 
     #[inline]
@@ -204,7 +206,7 @@ impl<'a> KBuff<'a> {
         lexeme.push(cur);
         match self.peek() {
             '/' => lexeme.push('/'),
-            _ => return Token::new(TokenType::Operator { lexeme }, 0),
+            _ => return Token::new(TokenType::Operator, lexeme, 0),
         }
         loop {
             lexeme.push(self.peek());
@@ -212,7 +214,7 @@ impl<'a> KBuff<'a> {
                 break;
             }
         }
-        Token::new(TokenType::Comment { lexeme }, 0)
+        Token::new(TokenType::Comment, lexeme, 0)
     }
 
     #[inline]
@@ -225,7 +227,7 @@ impl<'a> Iterator for KBuff<'a> {
     type Item = Token;
     fn next(&mut self) -> Option<Token> {
         let token = self.next_token();
-        if token.r#type == TokenType::EOF {
+        if token.token_t == TokenType::EOF {
             return None;
         }
         Some(token)
@@ -257,156 +259,84 @@ mod tests {
     fn test_parse_tokens() {
         let mut buf = KBuff::new("def");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(Def, 0));
+        assert_eq!(tok, Token::new(Def, "".to_owned(), 0));
         let mut buf = KBuff::new("foo");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Ident {
-                    lexeme: "foo".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Ident, "foo".to_owned(), 0));
 
         let mut buf = KBuff::new("extern");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(Extern, 0));
+        assert_eq!(tok, Token::new(Extern, "".to_owned(), 0));
         let mut buf = KBuff::new(",");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(Comma, 0));
+        assert_eq!(tok, Token::new(Comma, "".to_owned(), 0));
         let mut buf = KBuff::new(";");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(Delimiter, 0));
+        assert_eq!(tok, Token::new(Delimiter, "".to_owned(), 0));
         let mut buf = KBuff::new("(");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(LParenthesis, 0));
+        assert_eq!(tok, Token::new(LParenthesis, "".to_owned(), 0));
         let mut buf = KBuff::new(")");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(RParenthesis, 0));
+        assert_eq!(tok, Token::new(RParenthesis, "".to_owned(), 0));
         let mut buf = KBuff::new("[");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(LBracket, 0));
+        assert_eq!(tok, Token::new(LBracket, "".to_owned(), 0));
         let mut buf = KBuff::new("]");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(RBracket, 0));
+        assert_eq!(tok, Token::new(RBracket, "".to_owned(), 0));
     }
 
     #[test]
     fn test_parse_consecutive_tokens() {
         let mut buf = KBuff::new("def foo(x, y) extern, ; ()[]");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(Def, 0));
+        assert_eq!(tok, Token::new(Def, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Ident {
-                    lexeme: "foo".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Ident, "foo".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(LParenthesis, 0));
+        assert_eq!(tok, Token::new(LParenthesis, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Ident {
-                    lexeme: "x".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Ident, "x".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(Comma, 0));
+        assert_eq!(tok, Token::new(Comma, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Ident {
-                    lexeme: "y".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Ident, "y".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(RParenthesis, 0));
+        assert_eq!(tok, Token::new(RParenthesis, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(Extern, 0));
+        assert_eq!(tok, Token::new(Extern, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(Comma, 0));
+        assert_eq!(tok, Token::new(Comma, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(Delimiter, 0));
+        assert_eq!(tok, Token::new(Delimiter, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(LParenthesis, 0));
+        assert_eq!(tok, Token::new(LParenthesis, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(RParenthesis, 0));
+        assert_eq!(tok, Token::new(RParenthesis, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(LBracket, 0));
+        assert_eq!(tok, Token::new(LBracket, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(RBracket, 0));
+        assert_eq!(tok, Token::new(RBracket, "".to_owned(), 0));
     }
 
     #[test]
     fn test_parse_num() {
         let mut buf = KBuff::new("10");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Numeric {
-                    lexeme: "10".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Numeric, "10".to_owned(), 0));
         let mut buf = KBuff::new("20");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Numeric {
-                    lexeme: "20".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Numeric, "20".to_owned(), 0));
         let mut buf = KBuff::new("20.");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Numeric {
-                    lexeme: "20.".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Numeric, "20.".to_owned(), 0));
         let mut buf = KBuff::new("0.20");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Numeric {
-                    lexeme: "0.20".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Numeric, "0.20".to_owned(), 0));
         let mut buf = KBuff::new("23.4");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Numeric {
-                    lexeme: "23.4".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Numeric, "23.4".to_owned(), 0));
     }
 
     #[test]
@@ -426,159 +356,55 @@ mod tests {
     fn test_parse_single_char_ops() {
         let mut buf = KBuff::new("+");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Operator {
-                    lexeme: "+".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Operator, "+".to_owned(), 0));
         let mut buf = KBuff::new("-");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Operator {
-                    lexeme: "-".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Operator, "-".to_owned(), 0));
         let mut buf = KBuff::new("*");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Operator {
-                    lexeme: "*".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Operator, "*".to_owned(), 0));
         let mut buf = KBuff::new("/");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Operator {
-                    lexeme: "/".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Operator, "/".to_owned(), 0));
         let mut buf = KBuff::new("=");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Operator {
-                    lexeme: "=".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Operator, "=".to_owned(), 0));
     }
 
     #[test]
     fn test_parse_string() {
         let mut buf = KBuff::new("\"HelloWorld\"");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                String {
-                    lexeme: "HelloWorld".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(String, "HelloWorld".to_owned(), 0));
 
         let mut buf = KBuff::new("def hello_world() \"HelloWorld\"");
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(Def, 0));
+        assert_eq!(tok, Token::new(Def, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Ident {
-                    lexeme: "hello_world".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Ident, "hello_world".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(LParenthesis, 0));
+        assert_eq!(tok, Token::new(LParenthesis, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(tok, Token::new(RParenthesis, 0));
+        assert_eq!(tok, Token::new(RParenthesis, "".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                String {
-                    lexeme: "HelloWorld".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(String, "HelloWorld".to_owned(), 0));
     }
 
     #[test]
     fn test_parse_mutli_char_ops() {
         let mut buf = KBuff::new("!=");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Operator {
-                    lexeme: "!=".to_string()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Operator, "!=".to_string(), 0));
         let mut buf = KBuff::new("==");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Operator {
-                    lexeme: "==".to_string()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Operator, "==".to_string(), 0));
 
         let mut buf = KBuff::new("1 != 2");
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Numeric {
-                    lexeme: "1".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Numeric, "1".to_owned(), 0));
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Operator {
-                    lexeme: "!=".to_string()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Operator, "!=".to_string(), 0));
         let tok = buf.next_token();
-        assert_eq!(
-            tok,
-            Token::new(
-                Numeric {
-                    lexeme: "2".to_owned()
-                },
-                0
-            )
-        );
+        assert_eq!(tok, Token::new(Numeric, "2".to_owned(), 0));
     }
 }
