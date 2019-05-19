@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.com/KevinCybura/K_lang.svg?branch=master)](https://travis-ci.com/KevinCybura/K_lang)
+
+
 ```
 program          : [[statement | expression] Delimiter ? ]*;
 statement        : [declaration | definition];
@@ -10,15 +13,4 @@ unary_expr       : [( "!" | "-")? primary_expr];
 primary_expr     : [Ident | Number | call_expr | parenthesis_expr];
 call_expr        : Ident OpeningParenthesis [expression Comma ?]* ClosingParenthesis;
 parenthesis_expr : OpeningParenthesis expression ClosingParenthesis;
-
-
-expression     → equality ;
-equality       → comparison ( ( "!=" | "==" ) comparison )* ;
-comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
-addition       → multiplication ( ( "-" | "+" ) multiplication )* ;
-multiplication → unary ( ( "/" | "*" ) unary )* ;
-unary          → ( "!" | "-" ) unary
-               | primary ;
-primary        → NUMBER | STRING | "false" | "true" | "nil"
-               | "(" expression ")" ;
 ```
